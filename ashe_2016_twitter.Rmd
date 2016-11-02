@@ -1,0 +1,66 @@
+---
+title: "R Notebook"
+output:
+  html_document: default
+  html_notebook: default
+---
+
+```{r}
+library(tidyverse)
+library(twitteR)
+library(tidytext)
+library(stringr)
+```
+
+
+Get corpus
+```{r}
+consumer_api_key<-"<your key here>"
+consumer_secret<-"<your key here>"
+access_token<-"<your key here>"
+access_secret<-"<your key here>"
+
+setup_twitter_oauth(consumer_key =  consumer_api_key,
+                    consumer_secret = consumer_secret,
+                    access_token = access_token,
+                    access_secret = access_secret)
+
+ashe_results<-searchTwitter(searchString = "ASHE2016",n=1000,
+                            since = "2016-10-31"
+                            )
+#make data frame
+
+df<-tbl_df(map_df(ashe_results, as.data.frame))
+
+
+reg <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
+tweet_words <- df %>%
+  filter(!str_detect(text, '^"')) %>%
+  mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|&amp;", "")) %>%
+  unnest_tokens(word, text, token = "regex", pattern = reg) %>%
+  filter(!word %in% stop_words$word,
+         str_detect(word, "[a-z]")) %>%tbl_df()
+
+tweet_words
+
+nrc <- sentiments %>%
+  filter(lexicon == "nrc") %>%
+  dplyr::select(word, sentiment)
+
+tweet_words<-tweet_words%>%mutate(day=substr(created,1,10))
+
+Sys.Date()
+
+save(tweet_words,file=paste0("ashe_words_",Sys.Date(),".Rdata"))
+
+by_day_sentiment <- tweet_words %>%
+  inner_join(nrc, by = "word") %>%
+  count(sentiment,day)
+
+gg<-ggplot(by_day_sentiment,aes(x=sentiment,y=n,fill=sentiment))
+gg<-gg+geom_bar(stat="identity")
+gg<-gg+facet_wrap(~day)
+gg<-gg+scale_x_discrete(labels=element_blank())
+gg
+```
+
