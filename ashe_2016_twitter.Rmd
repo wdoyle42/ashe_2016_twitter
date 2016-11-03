@@ -5,15 +5,20 @@ output:
   html_notebook: default
 ---
 
+# ASHE Words: How are people feeling?
+
+
+
 ```{r}
 library(tidyverse)
+library(lubridate)
 library(twitteR)
 library(tidytext)
 library(stringr)
 ```
 
 
-Get corpus
+## Download 
 ```{r}
 consumer_api_key<-"<your key here>"
 consumer_secret<-"<your key here>"
@@ -25,42 +30,68 @@ setup_twitter_oauth(consumer_key =  consumer_api_key,
                     access_token = access_token,
                     access_secret = access_secret)
 
-ashe_results<-searchTwitter(searchString = "ASHE2016",n=1000,
-                            since = "2016-10-31"
-                            )
-#make data frame
+today<-ymd(today())
+yesterday<-today-1
+two_days_ago<-today-2
 
+ashe_results<-searchTwitter(searchString = "ASHE2016",n=1000,
+                            since = as.character(two_days_ago),
+                            until= as.character(yesterday)
+                            )
+```
+
+
+## Structure tweets as data
+```{r}
 df<-tbl_df(map_df(ashe_results, as.data.frame))
 
-
 reg <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
-tweet_words <- df %>%
+tweet_words_day <- df%>%
   filter(!str_detect(text, '^"')) %>%
   mutate(text = str_replace_all(text, "https://t.co/[A-Za-z\\d]+|&amp;", "")) %>%
   unnest_tokens(word, text, token = "regex", pattern = reg) %>%
   filter(!word %in% stop_words$word,
          str_detect(word, "[a-z]")) %>%tbl_df()
 
-tweet_words
+tweet_words_day
+
+tweet_words_day<-tweet_words_day%>%mutate(day=yesterday)
+
+save(tweet_words_day,file=paste0("ashe_words_",yesterday,".Rdata"))
+```
+
+
+## Get sentiments
+```{r}
 
 nrc <- sentiments %>%
   filter(lexicon == "nrc") %>%
-  dplyr::select(word, sentiment)
+  select(word, sentiment)
 
-tweet_words<-tweet_words%>%mutate(day=substr(created,1,10))
+startday<-ymd("2016-10-31")
 
-Sys.Date()
+seq_dates<-seq(startday,yesterday,by="days")
 
-save(tweet_words,file=paste0("ashe_words_",Sys.Date(),".Rdata"))
+tweet_words<-NULL
+for (date in as.character(seq_dates)){
+load(paste0("ashe_words_",date,".Rdata"))
+tweet_words<-rbind(tweet_words,tweet_words_day)
+  }
 
 by_day_sentiment <- tweet_words %>%
   inner_join(nrc, by = "word") %>%
   count(sentiment,day)
+```
 
+
+## Plot the result
+
+```{r}
 gg<-ggplot(by_day_sentiment,aes(x=sentiment,y=n,fill=sentiment))
 gg<-gg+geom_bar(stat="identity")
 gg<-gg+facet_wrap(~day)
 gg<-gg+scale_x_discrete(labels=element_blank())
 gg
 ```
+
 
