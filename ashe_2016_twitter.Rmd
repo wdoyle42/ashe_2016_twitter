@@ -1,5 +1,6 @@
 ---
-title: "R Notebook"
+title: "Sentiment Analysis of ASHE2016 Tweets"
+author: "Will Doyle"
 output:
   html_document: default
   html_notebook: default
@@ -7,8 +8,14 @@ output:
 
 # ASHE Words: How are people feeling?
 
+I've been discussing web scraping with students at LPO/Peabody, and I wanted to give a brief demonstration regarding how to do a sentiment analysis using twitter. What better way to do this than to track how people are feeling as they get ready for the ASHE conference in Columbus? 
+
+The code I'll use here is [ahem]*adapted* from the nifty sentiment analysis of Trump tweets by David Robinson [here](http://varianceexplained.org/r/trump-tweets/). It also owes a ton to the creates of the twitteR package and the tidytext package.
 
 
+The full github repo for this work is [here](https://github.com/wdoyle42/ashe_2016_twitter). You can get the `ashe_2016_twitter.Rmd` file, which contains all of the code necessary to replicate this analysis. 
+
+I start out by grabbing the necessary R packages:
 ```{r}
 library(tidyverse)
 library(lubridate)
@@ -18,33 +25,54 @@ library(stringr)
 ```
 
 
-## Download 
+## Get Tweets
+
+The [Twitter API](https://dev.twitter.com/overview/api) allows users to directly download a limited number of tweets, using various search terms. The twitteR package provides a convenient R-based interface for using the API. Below, I set the consumer and access keys and tokens provide to me by Twitter (you'll need your own) and then use the `searchTwitter` function to get all of the tweets from the previous day. 
+
+
 ```{r}
+## Keys: you'll need your own. 
 consumer_api_key<-"<your key here>"
 consumer_secret<-"<your key here>"
 access_token<-"<your key here>"
 access_secret<-"<your key here>"
 
+## My keys are stored in a separate file
+keys<-read_csv("keys.txt",col_names=FALSE)
+
+consumer_api_key<-keys$X1[1]
+consumer_secret<-keys$X1[2]
+access_token<-keys$X1[3]
+access_secret<-keys$X1[4]
+
+
+## Setup the authorization
 setup_twitter_oauth(consumer_key =  consumer_api_key,
                     consumer_secret = consumer_secret,
                     access_token = access_token,
                     access_secret = access_secret)
 
+## Set date range-- I want all tweets from yesterday
 today<-ymd(today())
 yesterday<-today-1
 two_days_ago<-today-2
 
+## Key function: this gets the results
 ashe_results<-searchTwitter(searchString = "ASHE2016",n=1000,
                             since = as.character(two_days_ago),
                             until= as.character(yesterday)
                             )
 ```
 
-
 ## Structure tweets as data
+
 ```{r}
 df<-tbl_df(map_df(ashe_results, as.data.frame))
+```
 
+The text from each tweet is stored as a string. I want to get rid of "stop" words and then create a dataset that has one line per word in each tweet. 
+
+```{r}
 reg <- "([^A-Za-z\\d#@']|'(?![A-Za-z\\d#@]))"
 tweet_words_day <- df%>%
   filter(!str_detect(text, '^"')) %>%
@@ -52,22 +80,35 @@ tweet_words_day <- df%>%
   unnest_tokens(word, text, token = "regex", pattern = reg) %>%
   filter(!word %in% stop_words$word,
          str_detect(word, "[a-z]")) %>%tbl_df()
+```
 
+And here's the dataset that results, with one line per tweet:
+
+```{r}
 tweet_words_day
+```
 
+I'm going to add the day that these tweets come from, then save that dataset. There are other ways to do this. 
+```{r}
 tweet_words_day<-tweet_words_day%>%mutate(day=yesterday)
 
 save(tweet_words_day,file=paste0("ashe_words_",yesterday,".Rdata"))
 ```
 
-
 ## Get sentiments
+
+Now I have data from each day, showing all of the words that were used that day. Next is to analyze sentiments. I need a lexicon that associates words with various sentiments. I'll use the [nrc](http://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm) lexicon to do this. 
+
 ```{r}
 
 nrc <- sentiments %>%
   filter(lexicon == "nrc") %>%
   select(word, sentiment)
+```
 
+Now to get all of the data previously stored. I started with Monday, 10/31/2016, and I go until today, loading all of the data from each day. 
+
+```{r}
 startday<-ymd("2016-10-31")
 
 seq_dates<-seq(startday,yesterday,by="days")
@@ -77,21 +118,42 @@ for (date in as.character(seq_dates)){
 load(paste0("ashe_words_",date,".Rdata"))
 tweet_words<-rbind(tweet_words,tweet_words_day)
   }
+```
 
+Next, grab the sentiments and associate them with the words, then count the number of sentiments of each type expressed each day. 
+```{r}
 by_day_sentiment <- tweet_words %>%
   inner_join(nrc, by = "word") %>%
   count(sentiment,day)
 ```
 
+Here's what the data look like:
+```{r}
+by_day_sentiment
+```
+
 
 ## Plot the result
+
+Now I'm ready to plot. Let's start with a bar plot by day:
+
 
 ```{r}
 gg<-ggplot(by_day_sentiment,aes(x=sentiment,y=n,fill=sentiment))
 gg<-gg+geom_bar(stat="identity")
-gg<-gg+facet_wrap(~day)
+gg<-gg+facet_wrap(~day,ncol=3)
 gg<-gg+scale_x_discrete(labels=element_blank())
+gg<-gg+xlab("Sentiment")+ylab("Number of Occurences")+ggtitle("Sentiments by Day")
 gg
 ```
 
+And, how about a line plot (this should get better as we get closer)
+
+## Sentiments by Day
+```{r}
+gg<-ggplot(by_day_sentiment,aes(x=ymd(day),y=n,color=sentiment))
+gg<-gg+geom_line()
+gg<-gg+xlab("Day")+ylab("Number of Occurences")+ggtitle("Sentiments by Day")
+gg
+```
 
