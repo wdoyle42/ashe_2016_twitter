@@ -1,16 +1,16 @@
 ---
-title: "Sentiment Analysis of ASHE2016 Tweets"
+title: 'Sentiment Analysis of #ASHE2016 Tweets'
 author: "Will Doyle"
 output:
-  html_document: default
   html_notebook: default
+  html_document: default
 ---
 
 # ASHE Words: How are people feeling?
 
 I've been discussing web scraping with students at LPO/Peabody, and I wanted to give a brief demonstration regarding how to do a sentiment analysis using twitter. What better way to do this than to track how people are feeling as they get ready for the ASHE conference in Columbus? 
 
-The code I'll use here is [ahem]*adapted* from the nifty sentiment analysis of Trump tweets by David Robinson [here](http://varianceexplained.org/r/trump-tweets/). It also owes a ton to the creates of the twitteR package and the tidytext package.
+The code I'll use here is [ahem]*adapted* from the nifty sentiment analysis of Trump tweets by David Robinson [here](http://varianceexplained.org/r/trump-tweets/). It also owes a ton to the creates of the [twitteR](https://cran.r-project.org/web/packages/twitteR/index.html) package and the [tidytext](https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html) package.
 
 
 The full github repo for this work is [here](https://github.com/wdoyle42/ashe_2016_twitter). You can get the `ashe_2016_twitter.Rmd` file, which contains all of the code necessary to replicate this analysis. 
@@ -22,6 +22,7 @@ library(lubridate)
 library(twitteR)
 library(tidytext)
 library(stringr)
+library(readr)
 ```
 
 
@@ -126,6 +127,24 @@ by_day_sentiment <- tweet_words %>%
   inner_join(nrc, by = "word") %>%
   count(sentiment,day)
 ```
+
+We can also see what the most common words are each day:
+```{r}
+
+by_day_common <-tweet_words%>%filter(word!="ashe2016",word!="rt")%>%
+  mutate(hash_flag=ifelse(str_detect(word,"#"),1,0),
+         at_flag=ifelse(str_detect(word,"@"),1,0),
+         n=n())%>%
+  group_by(day,at_flag,hash_flag)%>%
+  count(word,sort=TRUE)
+
+by_day_common%>%filter(hash_flag==1)  
+by_day_common%>%filter(at_flag==1)  
+by_day_common%>%filter(hash_flag==0&at_flag==0)%>%select(day,word,nn)
+
+
+```
+
 
 Here's what the data look like:
 ```{r}
