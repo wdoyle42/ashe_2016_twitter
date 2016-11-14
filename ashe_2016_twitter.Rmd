@@ -158,7 +158,7 @@ by_day_sentiment
 Now I'm ready to plot. Let's start with a bar plot by day (notice that the scales are not the same for each day):
 
 
-```{r fig.width=11,fig.height=8}
+```{r fig.width=9,fig.height=6}
 gg<-ggplot(by_day_sentiment,aes(x=sentiment,y=n,fill=sentiment))
 gg<-gg+geom_bar(stat="identity")
 gg<-gg+facet_wrap(~day,ncol=4,scales="free")
@@ -170,7 +170,7 @@ gg
 
 This is what the same graphic looks like if the scales are fixed. 
 
-```{r fig.width=11,fig.height=8}
+```{r fig.width=9,fig.height=6}
 gg<-ggplot(by_day_sentiment,aes(x=sentiment,y=n,fill=sentiment))
 gg<-gg+geom_bar(stat="identity")
 gg<-gg+facet_wrap(~day,ncol=4)
@@ -209,12 +209,12 @@ words
 ```
 
 Now it's ready to plot. Notice that the scales are different for each facet. 
-```{r, fig.width=11,fig.height=8}
+```{r, fig.width=9,fig.height=6}
 gg<-ggplot(filter(words),aes(x=word, y=nn,fill=as.factor(day)))
 gg<-gg+geom_bar(stat="identity")
 gg<-gg+facet_wrap(~day,scales="free")
-gg<-gg+theme(axis.text.x = element_text(angle = 60, hjust = 1,size=12),legend.position="none")
-gg<-gg+theme(strip.text=element_text(size=12))
+gg<-gg+theme(axis.text.x = element_text(angle = 60, hjust = 1,size=14),legend.position="none")
+gg<-gg+theme(strip.text=element_text(size=14))
 gg<-gg+xlab("")+ylab("Count")
 gg<-gg+ggtitle("Most common words in #ASHE2016 Twitter posts,by day")
 gg
