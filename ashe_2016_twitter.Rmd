@@ -23,6 +23,7 @@ library(twitteR)
 library(tidytext)
 library(stringr)
 library(readr)
+library(forcats)
 ```
 
 
@@ -154,21 +155,34 @@ by_day_sentiment
 
 ## Plot the result
 
-Now I'm ready to plot. Let's start with a bar plot by day:
+Now I'm ready to plot. Let's start with a bar plot by day (notice that the scales are not the same for each day):
 
 
-```{r}
+```{r fig.width=11,fig.height=8}
 gg<-ggplot(by_day_sentiment,aes(x=sentiment,y=n,fill=sentiment))
 gg<-gg+geom_bar(stat="identity")
-gg<-gg+facet_wrap(~day,ncol=3)
+gg<-gg+facet_wrap(~day,ncol=4,scales="free")
 gg<-gg+scale_x_discrete(labels=element_blank())
 gg<-gg+xlab("Sentiment")+ylab("Number of Occurences")+ggtitle("Sentiments by Day")
+gg<-gg+theme(legend.position="bottom")
 gg
 ```
 
-And, how about a line plot (this should get better as we get closer)
+This is what the same graphic looks like if the scales are fixed. 
 
-## Sentiments by Day
+```{r fig.width=11,fig.height=8}
+gg<-ggplot(by_day_sentiment,aes(x=sentiment,y=n,fill=sentiment))
+gg<-gg+geom_bar(stat="identity")
+gg<-gg+facet_wrap(~day,ncol=4)
+gg<-gg+scale_x_discrete(labels=element_blank())
+gg<-gg+xlab("Sentiment")+ylab("Number of Occurences")+ggtitle("Sentiments by Day")
+gg<-gg+theme(legend.position="bottom")
+gg
+```
+
+
+And, how about a line plot?
+
 ```{r}
 gg<-ggplot(by_day_sentiment,aes(x=ymd(day),y=n,color=sentiment))
 gg<-gg+geom_line()
@@ -176,3 +190,33 @@ gg<-gg+xlab("Day")+ylab("Number of Occurences")+ggtitle("Sentiments by Day")
 gg
 ```
 
+## What terms are trending?
+
+We can also use these tweets to get a sense of which words were being used in tweets during the time around the conference. 
+
+This begins by creating a dataset that filters out any hash tags or individual tags.  
+
+```{r}
+
+words<-by_day_common%>%filter(hash_flag==0&at_flag==0)%>%select(day,word,nn)
+```
+
+Then, subset the data to be just the top 10 words for each day.
+
+```{r}
+words<-words%>%group_by(day)%>%filter(nn>5)%>%mutate(word=fct_reorder(f=as.factor(word),x=nn))%>%top_n(10, nn)
+words
+```
+
+Now it's ready to plot. Notice that the scales are different for each facet. 
+```{r, fig.width=11,fig.height=8}
+gg<-ggplot(filter(words),aes(x=word, y=nn,fill=as.factor(day)))
+gg<-gg+geom_bar(stat="identity")
+gg<-gg+facet_wrap(~day,scales="free")
+gg<-gg+theme(axis.text.x = element_text(angle = 60, hjust = 1,size=12),legend.position="none")
+gg<-gg+theme(strip.text=element_text(size=12))
+gg<-gg+xlab("")+ylab("Count")
+gg<-gg+ggtitle("Most common words in #ASHE2016 Twitter posts,by day")
+gg
+
+```
